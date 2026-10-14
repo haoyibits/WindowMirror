@@ -104,31 +104,6 @@ Resources/*.lproj         本地化的 App 名称
 build.sh / install.sh     构建 / 安装脚本
 ```
 
-重新生成图标：
-
-```bash
-swift Icon/draw_icon.swift Icon/icon_1024.png
-```
-
-然后用 `sips` 和 `iconutil` 生成各尺寸，做成 `AppIcon.icns`。
-
-## 调试
-
-用环境变量启动，日志输出到标准错误：
-
-```bash
-open --env WM_DEBUG=1 --stderr /tmp/wm.log /Applications/WindowMirror.app
-```
-
-| 变量 | 作用 |
-|---|---|
-| `WM_DEBUG=1` | 输出日志 |
-| `WM_AUTOSTART=<应用名片段>` | 启动后自动镜像该应用在主屏上的第一个窗口 |
-| `WM_SNAPSHOT=<路径.png>` | 把第 30 帧原始画面存成图片 |
-| `WM_AUTOMATCH=<0-3>` | 自动按副屏调整源窗口，0 到 3 依次对应上表四种方式 |
-| `WM_TESTDRAW=<目录>` | 注入测试标注，并截下自身窗口存到该目录 |
-| `WM_DUMPMENU=1` | 用英文和中文各打印一遍完整菜单，然后退出 |
-
 ## 许可证
 
 [MIT](LICENSE)

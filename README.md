@@ -106,31 +106,6 @@ Resources/*.lproj         Localized app name
 build.sh / install.sh     Build and install scripts
 ```
 
-To redraw the icon, run:
-
-```bash
-swift Icon/draw_icon.swift Icon/icon_1024.png
-```
-
-Then use `sips` and `iconutil` to build `AppIcon.icns` from it.
-
-## Debugging
-
-Launch the app with environment variables, and the log goes to standard error:
-
-```bash
-open --env WM_DEBUG=1 --stderr /tmp/wm.log /Applications/WindowMirror.app
-```
-
-| Variable | Effect |
-|---|---|
-| `WM_DEBUG=1` | Write log output |
-| `WM_AUTOSTART=<app name fragment>` | On launch, mirror that app's first window on the main screen |
-| `WM_SNAPSHOT=<path.png>` | Save frame 30 as a PNG |
-| `WM_AUTOMATCH=<0-3>` | Fit the source window automatically; 0 to 3 are the four options in the table above |
-| `WM_TESTDRAW=<directory>` | Inject test annotations and save screenshots of the app's own windows to that directory |
-| `WM_DUMPMENU=1` | Print the full menu in English and Chinese, then quit |
-
 ## License
 
 [MIT](LICENSE)
