@@ -1,4 +1,4 @@
-<p align="center"><img src="Icon/icon_1024.png" width="128" alt="WindowMirror icon"></p>
+<p align="center"><img src="Icon/icon_1024.png?v=2" width="128" alt="WindowMirror icon"></p>
 
 <h1 align="center">WindowMirror</h1>
 

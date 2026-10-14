@@ -1,4 +1,4 @@
-<p align="center"><img src="Icon/icon_1024.png" width="128" alt="WindowMirror 图标"></p>
+<p align="center"><img src="Icon/icon_1024.png?v=2" width="128" alt="WindowMirror 图标"></p>
 
 <h1 align="center">WindowMirror · 窗口镜像</h1>
 
