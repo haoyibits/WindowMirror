@@ -121,3 +121,7 @@ open --env WM_DEBUG=1 --stderr /tmp/wm.log /Applications/WindowMirror.app
 | `WM_SNAPSHOT=<路径.png>` | 把第 30 帧原始画面存成图片 |
 | `WM_AUTOMATCH=<0-3>` | 自动按副屏调整源窗口，0 到 3 依次对应上表四种方式 |
 | `WM_TESTDRAW=<目录>` | 注入测试标注，并截下自身窗口存到该目录 |
+
+## 许可证
+
+[MIT](LICENSE)

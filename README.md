@@ -125,3 +125,7 @@ open --env WM_DEBUG=1 --stderr /tmp/wm.log /Applications/WindowMirror.app
 | `WM_SNAPSHOT=<path.png>` | Save frame 30 as a PNG |
 | `WM_AUTOMATCH=<0-3>` | Fit the source window automatically; 0 to 3 are the four options in the table above |
 | `WM_TESTDRAW=<directory>` | Inject test annotations and save screenshots of the app's own windows to that directory |
+
+## License
+
+[MIT](LICENSE)
