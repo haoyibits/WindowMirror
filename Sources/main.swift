@@ -1,5 +1,5 @@
-// WindowMirror —— 把主屏上的某个窗口实时镜像到副屏
-// 依赖：macOS 14+，ScreenCaptureKit
+// WindowMirror — mirrors a window on the main screen to a secondary display in real time
+// Requires macOS 14+ and ScreenCaptureKit
 
 import AppKit
 @preconcurrency import ScreenCaptureKit
@@ -8,9 +8,9 @@ import CoreVideo
 import CoreImage
 import Carbon.HIToolbox
 
-// MARK: - 小工具
+// MARK: - Utilities
 
-/// 界面语言：跟随系统（系统首选语言为中文时用中文，否则英文）/ 英文 / 中文
+/// UI language: follow the system (Chinese when the preferred system language is Chinese, otherwise English) / English / Chinese
 enum AppLanguage: String, CaseIterable { case system, en, zh }
 
 enum L10n {
@@ -27,7 +27,7 @@ enum L10n {
     }
 }
 
-/// 按当前语言取英文或中文
+/// Picks the English or Chinese string for the current language
 func L(_ en: String, _ zh: String) -> String { L10n.isChinese ? zh : en }
 
 enum FillMode: String, CaseIterable {
@@ -56,10 +56,21 @@ extension NSScreen {
     }
 }
 
+/// Frame of a window in Cocoa global coordinates (bottom-left origin); nil when it isn't on screen
+func onScreenFrame(of wid: CGWindowID) -> CGRect? {
+    guard let info = (CGWindowListCopyWindowInfo([.optionIncludingWindow], wid) as? [[String: Any]])?.first,
+          (info[kCGWindowIsOnscreen as String] as? Bool) == true,
+          let bd = info[kCGWindowBounds as String] as? NSDictionary,
+          let r = CGRect(dictionaryRepresentation: bd as CFDictionary)
+    else { return nil }
+    let h = NSScreen.screens.first?.frame.height ?? 0
+    return CGRect(x: r.minX, y: h - r.maxY, width: r.width, height: r.height)
+}
+
 let debugLog = ProcessInfo.processInfo.environment["WM_DEBUG"] != nil
 func dlog(_ s: @autoclosure () -> String) { if debugLog { FileHandle.standardError.write((s() + "\n").data(using: .utf8)!) } }
 
-// MARK: - 显示画面的视图与窗口
+// MARK: - Mirror view and window
 
 final class MirrorView: NSView {
     private let imageLayer = CALayer()
@@ -70,7 +81,7 @@ final class MirrorView: NSView {
         didSet { imageLayer.contentsGravity = gravity; annotationLayer.setNeedsDisplay() }
     }
 
-    /// 源画面在本视图中实际显示的区域（视图坐标）
+    /// Area where the source image is actually shown in this view (view coordinates)
     func displayedContentRect() -> CGRect {
         let b = bounds, sp = sourcePixelSize
         guard sp.width > 0, sp.height > 0 else { return b }
@@ -119,7 +130,7 @@ final class MirrorView: NSView {
         annotationLayer.setNeedsDisplay()
     }
 
-    /// 视图在当前屏幕上的像素尺寸
+    /// Pixel size of the view on its current screen
     var pixelSize: CGSize {
         let k = window?.backingScaleFactor ?? 2
         return CGSize(width: bounds.width * k, height: bounds.height * k)
@@ -152,18 +163,18 @@ final class MirrorWindow: NSWindow {
     }
 }
 
-// MARK: - 抓取引擎
+// MARK: - Capture engine
 
 final class CaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     private let queue = DispatchQueue(label: "WindowMirror.capture", qos: .userInteractive)
-    // 以下状态只在 queue 上访问
+    // The state below is only accessed on `queue`
     private var stream: SCStream?
     private var config: SCStreamConfiguration?
     private var resizing = false
 
-    /// 每帧回调（在后台队列）：画面 surface 与需要显示的归一化裁剪区域
+    /// Per-frame callback (on a background queue): the frame surface and the normalized crop rect to show
     var onFrame: ((IOSurface, CGRect) -> Void)?
-    /// 流被系统终止（例如源窗口被关闭）
+    /// The stream was stopped by the system (e.g. the source window was closed)
     var onStop: ((Error?) -> Void)?
 
     func start(filter: SCContentFilter, showsCursor: Bool, hdr: Bool) async throws {
@@ -185,13 +196,13 @@ final class CaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @unchecke
         c.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         c.queueDepth = 5
         if hdr, #available(macOS 15.0, *) {
-            // HDR：半精度浮点 + 扩展 P3，保留超过 SDR 白点的高光，按源显示器的观感抓取
+            // HDR: half float + extended P3 keeps highlights above SDR white, captured as it looks on the source display
             c.captureDynamicRange = .hdrLocalDisplay
             c.pixelFormat = kCVPixelFormatType_64RGBAHalf
             c.colorSpaceName = CGColorSpace.extendedDisplayP3
         } else {
             c.pixelFormat = kCVPixelFormatType_32BGRA
-            c.colorSpaceName = CGColorSpace.displayP3   // 广色域抓取，避免被压到 sRGB
+            c.colorSpaceName = CGColorSpace.displayP3   // Wide-gamut capture so colors aren't squeezed into sRGB
         }
         c.showsCursor = showsCursor
         c.ignoreShadowsSingleWindow = true
@@ -220,10 +231,10 @@ final class CaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @unchecke
     private var loggedColor = false
     private var hdrActive = false
 
-    /// 当前流是否为 HDR
+    /// Whether the current stream is HDR
     var isHDR: Bool { queue.sync { stream != nil && hdrActive } }
 
-    /// 当前输出分辨率（像素）
+    /// Current output resolution (pixels)
     var outputPixelSize: CGSize {
         queue.sync { config.map { CGSize(width: $0.width, height: $0.height) } ?? .zero }
     }
@@ -255,13 +266,13 @@ final class CaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @unchecke
            let cr = CGRect(dictionaryRepresentation: d as CFDictionary),
            let cs = info[.contentScale] as? CGFloat, cs > 0,
            let sf = info[.scaleFactor] as? CGFloat, sf > 0 {
-            // contentRect 单位为点：换算成像素后得到画面在缓冲区中的有效区域
+            // contentRect is in points: convert it to pixels to get the valid region of the buffer
             let px = CGRect(x: cr.minX * sf, y: cr.minY * sf, width: cr.width * sf, height: cr.height * sf)
             if bufW > 0, bufH > 0 {
                 crop = CGRect(x: px.minX / bufW, y: px.minY / bufH,
                               width: min(1, px.width / bufW), height: min(1, px.height / bufH))
             }
-            // 源窗口尺寸变化后，同步调整输出分辨率，保证清晰度
+            // When the source window is resized, adjust the output resolution to keep it sharp
             let wantW = Int((cr.width / cs * sf).rounded())
             let wantH = Int((cr.height / cs * sf).rounded())
             if let c = config, !resizing, wantW >= 16, wantH >= 16,
@@ -274,7 +285,7 @@ final class CaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @unchecke
                 }
             }
         }
-        // 确保画面带有色彩空间标记，Core Animation 才会按正确色域转换到目标显示器
+        // Make sure the surface is tagged with a color space so Core Animation converts it correctly for the target display
         if !loggedColor {
             loggedColor = true
             dlog("color: hdr=\(hdrActive) fmt=\(CVPixelBufferGetPixelFormatType(pb)) surface tag=\(String(describing: IOSurfaceCopyValue(surface, kIOSurfaceColorSpace))) " +
@@ -296,7 +307,7 @@ final class CaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @unchecke
     }
 }
 
-// MARK: - 应用主体（菜单栏）
+// MARK: - App (menu bar)
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate, SCContentSharingPickerObserver {
@@ -309,6 +320,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var mirroringTitle: String?
     private var lastFilter: SCContentFilter?
     private let annotations = AnnotationController()
+    private let toolbar = SourceToolbar()
     private var sourceWindowID: CGWindowID?
     private var sourcePID: pid_t?
 
@@ -321,11 +333,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         get { defaults.object(forKey: "showsCursor") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "showsCursor"); engine.setShowsCursor(newValue && annotations.tool != .laser) }
     }
+    private var showsToolbar: Bool {
+        get { defaults.object(forKey: "showToolbar") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "showToolbar"); toolbar.sourceWindowID = newValue ? sourceWindowID : nil }
+    }
     private var hdrEnabled: Bool {
         get { defaults.object(forKey: "hdr") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "hdr") }
     }
-    /// 用户指定的目标显示器；nil 表示自动（第一块非主屏）
+    /// Target display chosen by the user; nil means automatic (the first non-main display)
     private var targetDisplayID: CGDirectDisplayID? {
         get { (defaults.object(forKey: "targetDisplay") as? NSNumber)?.uint32Value }
         set { defaults.set(newValue.map { NSNumber(value: $0) }, forKey: "targetDisplay") }
@@ -375,8 +391,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
     }
 
-    /// 仅调试用：WM_AUTOSTART=<应用名片段> 自动镜像该应用在主屏的第一个窗口；
-    /// WM_SNAPSHOT=<路径.png> 把第 30 帧原始画面存成图片
+    /// Debug only: WM_AUTOSTART=<app name fragment> mirrors that app's first window on the main screen;
+    /// WM_SNAPSHOT=<path.png> saves the 30th raw frame as an image
     private func runDebugHooks() {
         let env = ProcessInfo.processInfo.environment
         if env["WM_DUMPMENU"] != nil {
@@ -450,7 +466,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
     }
 
-    // MARK: 菜单
+    // MARK: Menu
 
     private func updateStatusIcon() {
         let name = mirroringTitle == nil ? "rectangle.on.rectangle" : "rectangle.fill.on.rectangle.fill"
@@ -476,7 +492,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         menu.addItem(listItem)
         menu.addItem(.separator())
 
-        // 标注
+        // Annotation
         let annMenu = NSMenu()
         let canAnnotate = annotations.sourceWindowID != nil
         func toolItem(_ title: String, _ t: AnnotationTool, _ key: String) -> NSMenuItem {
@@ -518,12 +534,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let fade = item(L("Fade Strokes After a Few Seconds", "笔迹几秒后自动消失"), #selector(toggleAutoFade))
         fade.state = annotations.model.autoFade ? .on : .off
         annMenu.addItem(fade)
+        let tb = item(L("Show Toolbar Above Source Window", "在源窗口上方显示工具栏"), #selector(toggleToolbar))
+        tb.state = showsToolbar ? .on : .off
+        annMenu.addItem(tb)
         let annItem = NSMenuItem(title: canAnnotate ? L("Annotate", "标注") : L("Annotate (start mirroring first)", "标注（先开始镜像）"), action: nil, keyEquivalent: "")
         annItem.submenu = annMenu
         menu.addItem(annItem)
         menu.addItem(.separator())
 
-        // 目标显示器
+        // Target display
         let screenMenu = NSMenu()
         let auto = item(L("Automatic (first secondary display)", "自动（第一块副屏）"), #selector(selectTargetScreen(_:)))
         auto.tag = 0
@@ -541,7 +560,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         screenItem.submenu = screenMenu
         menu.addItem(screenItem)
 
-        // 缩放方式
+        // Scaling
         let fillMenu = NSMenu()
         for (i, f) in FillMode.allCases.enumerated() {
             let it = item(f.title, #selector(selectFillMode(_:)))
@@ -576,12 +595,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 menu.addItem(info)
             }
             let resizeMenu = NSMenu()
-            for (mode, title, key) in [(ResizeMode.native, L("Pixel 1:1 (same size as target)", "像素 1:1（与副屏同尺寸）"), "m"),
-                                       (.largest, L("Same Ratio, Largest", "同比例，尽量大"), "r"),
-                                       (.keepWidth, L("Same Ratio, Keep Width", "同比例，保持当前宽度"), ""),
-                                       (.keepHeight, L("Same Ratio, Keep Height", "同比例，保持当前高度"), "")] {
-                let it = item(title, #selector(resizeSourceAction(_:)), key: key)
-                if !key.isEmpty { it.keyEquivalentModifierMask = [.control, .option] }
+            for mode in ResizeMode.allCases {
+                let it = item(mode.title, #selector(resizeSourceAction(_:)), key: mode.key)
+                if !mode.key.isEmpty { it.keyEquivalentModifierMask = [.control, .option] }
                 it.tag = mode.rawValue
                 resizeMenu.addItem(it)
             }
@@ -616,7 +632,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         return it
     }
 
-    /// 用 CGWindowList 同步列出主屏上的普通窗口（菜单需要同步填充）
+    /// Lists normal windows on the main screen via CGWindowList (the menu has to be filled synchronously)
     private func rebuildWindowList() {
         windowListMenu.removeAllItems()
 
@@ -665,7 +681,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
     }
 
-    // MARK: 动作
+    // MARK: Actions
 
     @objc private func pickWithSystemPicker() {
         let picker = SCContentSharingPicker.shared
@@ -708,6 +724,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc private func selectLanguage(_ sender: NSMenuItem) {
         L10n.setting = AppLanguage(rawValue: sender.representedObject as? String ?? "") ?? .system
         updateStatusIcon()
+        toolbar.updateTooltips()
         if let w = mirrorWindow, w.styleMask.contains(.titled) {
             w.title = L("Mirror: \(mirroringTitle ?? "")", "镜像：\(mirroringTitle ?? "")")
         }
@@ -724,9 +741,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         mirrorView.annotationLayer.model = annotations.model
         annotations.onToolChange = { [weak self] t in
             guard let self else { return }
-            // 激光笔模式下隐藏镜像里的系统指针，只留红点
+            // In laser mode, hide the system pointer in the mirror and show only the dot
             self.engine.setShowsCursor(self.showsCursor && t != .laser)
             self.updateStatusIcon()
+            self.syncToolbar()
+        }
+        toolbar.onAction = { [weak self] action in
+            guard let self else { return }
+            switch action {
+            case .tool(let t): self.annotations.toggle(t)
+            case .undo: self.annotations.undo()
+            case .clear: self.annotations.clear()
+            case .color(let c): self.annotations.setColor(c); self.syncToolbar()
+            case .resize(let mode): self.resizeSource(mode)
+            case .stop: self.stopMirroring()
+            }
         }
         let kc = { (k: Int) in k }
         HotKeys.register(1, keyCode: kc(kVK_ANSI_L)) { [weak self] in MainActor.assumeIsolated { self?.annotations.toggle(.laser) } }
@@ -751,7 +780,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc private func clearStrokes() { annotations.clear() }
     @objc private func selectAnnotationColor(_ sender: NSMenuItem) {
         annotations.setColor(Self.annotationColors[sender.tag].2)
+        syncToolbar()
     }
+    @objc private func toggleToolbar() { showsToolbar.toggle() }
+
+    private func syncToolbar() { toolbar.update(tool: annotations.tool, color: annotations.model.color) }
     @objc private func toggleAutoFade() {
         annotations.model.autoFade.toggle()
         defaults.set(annotations.model.autoFade, forKey: "autoFade")
@@ -759,7 +792,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc private func toggleHDR() {
         hdrEnabled.toggle()
-        // 正在镜像时用同一个源重新开始
+        // If mirroring, restart with the same source
         if let f = lastFilter, let t = mirroringTitle {
             let wid = sourceWindowID, pid = sourcePID
             Task {
@@ -796,7 +829,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
     }
 
-    // MARK: 镜像控制
+    // MARK: Mirroring
 
     private func startMirroring(filter: SCContentFilter, title: String, window: SCWindow?) {
         mirroringTitle = title
@@ -804,6 +837,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         sourcePID = window?.owningApplication?.processID
         annotations.setTool(.none)
         annotations.sourceWindowID = window?.windowID
+        toolbar.sourceWindowID = showsToolbar ? window?.windowID : nil
+        syncToolbar()
         lastFilter = filter
         updateStatusIcon()
         mirrorView.clear()
@@ -823,6 +858,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private func stopMirroring() {
         annotations.setTool(.none)
         annotations.sourceWindowID = nil
+        toolbar.sourceWindowID = nil
         mirroringTitle = nil
         sourceWindowID = nil
         sourcePID = nil
@@ -842,7 +878,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         return screens.first(where: { $0.displayID != main }) ?? screens.first ?? NSScreen.main!
     }
 
-    /// 目标是副屏：无边框铺满整块屏幕；目标是主屏（例如只有一块屏）：普通可调整大小的窗口
+    /// Secondary display target: borderless, covering the whole screen; main display target (e.g. only one screen): a normal resizable window
     private func placeMirrorWindow() {
         let screen = targetScreen()
         let fullscreen = screen.displayID != CGMainDisplayID()
@@ -874,7 +910,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         mirrorWindow = win
 
         if fullscreen {
-            win.orderFrontRegardless()      // 不抢主屏的焦点
+            win.orderFrontRegardless()      // Don't steal focus on the main screen
         } else {
             win.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -906,9 +942,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         } catch { dlog("debug capture error: \(error)") }
     }
 
-    // MARK: 源窗口尺寸匹配
+    // MARK: Matching the source window size
 
-    enum ResizeMode: Int { case native = 0, largest, keepWidth, keepHeight }
+    enum ResizeMode: Int, CaseIterable {
+        case native = 0, largest, keepWidth, keepHeight
+        var title: String {
+            switch self {
+            case .native: return L("Pixel 1:1 (same size as target)", "像素 1:1（与副屏同尺寸）")
+            case .largest: return L("Same Ratio, Largest", "同比例，尽量大")
+            case .keepWidth: return L("Same Ratio, Keep Width", "同比例，保持当前宽度")
+            case .keepHeight: return L("Same Ratio, Keep Height", "同比例，保持当前高度")
+            }
+        }
+        /// Global hotkey letter (with ⌃⌥), if any
+        var key: String {
+            switch self {
+            case .native: return "m"
+            case .largest: return "r"
+            default: return ""
+            }
+        }
+    }
 
     @objc private func resizeSourceAction(_ sender: NSMenuItem) {
         resizeSource(ResizeMode(rawValue: sender.tag) ?? .largest)
@@ -916,7 +970,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc private func matchSourceToTarget() { resizeSource(.native) }
 
-    /// 按副屏（镜像视图）的像素尺寸或宽高比调整源窗口
+    /// Resizes the source window to the pixel size or aspect ratio of the target (the mirror view)
     private func resizeSource(_ mode: ResizeMode) {
         guard let wid = sourceWindowID, let pid = sourcePID, mirrorWindow != nil else { NSSound.beep(); return }
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -935,7 +989,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 guard let w = content.windows.first(where: { $0.windowID == wid }) else {
                     showAlert(L("Source window not found", "找不到源窗口"), L("It may have been closed.", "它可能已经关闭。")); return
                 }
-                // 源窗口所在显示器（取重叠面积最大的那块）及其可见区域（CG 坐标，左上角为原点）
+                // Display the source window is on (largest overlap) and its visible area (CG coordinates, top-left origin)
                 let disp = content.displays.max(by: {
                     let a = $0.frame.intersection(w.frame), b = $1.frame.intersection(w.frame)
                     return a.width * a.height < b.width * b.height
@@ -956,7 +1010,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 case .keepWidth: want = CGSize(width: w.frame.width, height: w.frame.width / aspect)
                 case .keepHeight: want = CGSize(width: w.frame.height * aspect, height: w.frame.height)
                 }
-                // 放不下就等比缩小
+                // Scale down proportionally if it doesn't fit
                 var clamped = false
                 if want.width > vf.width + 0.5 || want.height > vf.height + 0.5 {
                     let k = min(vf.width / want.width, vf.height / want.height)
@@ -964,7 +1018,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                     clamped = true
                 }
                 want = CGSize(width: want.width.rounded(.down), height: want.height.rounded(.down))
-                // 位置尽量不动，只在超出可见区域时挪回来
+                // Keep the position if possible; only move it back when it goes past the visible area
                 var origin = w.frame.origin
                 origin.x = min(max(origin.x, vf.minX), vf.maxX - want.width)
                 origin.y = min(max(origin.y, vf.minY), vf.maxY - want.height)
@@ -974,7 +1028,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 }
                 Self.axSet(ax, kAXPositionAttribute, origin)
                 Self.axSet(ax, kAXSizeAttribute, want)
-                Self.axSet(ax, kAXPositionAttribute, origin)   // 有些应用会按新尺寸重新约束位置
+                Self.axSet(ax, kAXPositionAttribute, origin)   // Some apps re-constrain the position after a size change
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 let got = Self.axSize(ax) ?? .zero
                 dlog("resize \(mode): target=\(targetPx) aspect=\(aspect) vf=\(vf) want=\(want) got=\(got)")
@@ -1060,7 +1114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
     }
 
-    // MARK: 杂项
+    // MARK: Misc
 
     private func showAlert(_ title: String, _ text: String) {
         NSApp.activate(ignoringOtherApps: true)

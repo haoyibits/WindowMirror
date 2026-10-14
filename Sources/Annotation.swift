@@ -1,6 +1,7 @@
-// 标注：激光笔 / 画笔 / 荧光笔
-// 在主屏源窗口上方盖一层透明面板接收鼠标，坐标按源窗口归一化（0~1，左上角为原点），
-// 同一份数据同时画在主屏面板和副屏镜像上。
+// Annotation: laser pointer / pen / highlighter
+// A transparent panel over the source window on the main screen receives the mouse. Coordinates are
+// normalized to the source window (0–1, top-left origin), and the same data is drawn both on that panel
+// and on the mirror on the secondary display.
 
 import AppKit
 import Carbon.HIToolbox
@@ -8,10 +9,10 @@ import Carbon.HIToolbox
 enum AnnotationTool: Equatable { case none, laser, pen, highlighter }
 
 struct Stroke {
-    var points: [CGPoint]          // 归一化坐标
+    var points: [CGPoint]          // Normalized coordinates
     var color: NSColor
     var alpha: CGFloat
-    var width: CGFloat             // 相对源窗口高度的比例
+    var width: CGFloat             // Fraction of the source window height
     var fades: Bool
     var endedAt: CFTimeInterval?
 
@@ -46,7 +47,7 @@ final class AnnotationModel {
         strokes.removeAll { $0.opacity(now: now) <= 0 }
         if let last = laser.last {
             laser.removeAll { now - $0.t > AnnotationModel.laserTrail }
-            if laser.isEmpty { laser = [(last.p, last.t)] }   // 保留最后一个点作为光点位置
+            if laser.isEmpty { laser = [(last.p, last.t)] }   // Keep the last point as the dot position
         }
     }
 }
@@ -81,7 +82,7 @@ enum AnnotationRenderer {
             ctx.strokePath()
         }
 
-        // 激光笔：渐隐的尾迹 + 发光的点
+        // Laser: fading trail + glowing dot
         guard m.tool == .laser, m.laserVisible, let head = m.laser.last else { return }
         let r = max(5, rect.height * 0.009)
         let color = m.color
@@ -109,7 +110,7 @@ enum AnnotationRenderer {
     }
 }
 
-/// 绘制标注的图层；rectProvider 给出源窗口画面在图层中的位置
+/// Layer that draws annotations; rectProvider gives where the source image sits in the layer
 final class AnnotationLayer: CALayer {
     var model: AnnotationModel?
     var rectProvider: (() -> CGRect)?
@@ -128,7 +129,7 @@ final class AnnotationLayer: CALayer {
     }
 }
 
-// MARK: - 主屏上的透明标注面板
+// MARK: - Transparent annotation panel on the main screen
 
 final class OverlayView: NSView {
     let annotationLayer = AnnotationLayer()
@@ -171,13 +172,13 @@ final class OverlayPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-// MARK: - 控制器
+// MARK: - Controller
 
 @MainActor
 final class AnnotationController {
     let model = AnnotationModel()
     var sourceWindowID: CGWindowID?
-    /// 副屏镜像上的标注图层
+    /// Annotation layer on the mirror on the secondary display
     var mirrorLayer: AnnotationLayer?
     var onToolChange: ((AnnotationTool) -> Void)?
 
@@ -186,12 +187,12 @@ final class AnnotationController {
     private var trackTimer: Timer?
     private var animTimer: Timer?
     private var monitors: [Any] = []
-    private var sourceFrame: CGRect = .zero   // Cocoa 全局坐标
+    private var sourceFrame: CGRect = .zero   // Cocoa global coordinates
     private var dirty = false
 
     var tool: AnnotationTool { model.tool }
 
-    /// 选中同一工具再按一次 = 退出标注
+    /// Choosing the active tool again exits annotation
     func toggle(_ t: AnnotationTool) { setTool(model.tool == t ? .none : t) }
 
     func setTool(_ t: AnnotationTool) {
@@ -202,7 +203,7 @@ final class AnnotationController {
         } else {
             setup()
             panel?.ignoresMouseEvents = (t == .laser)
-            // 透明区域默认会让点击穿透，画笔模式下铺一层几乎看不见的底色来接住鼠标
+            // Clicks pass through transparent areas, so in drawing modes use a nearly invisible background to catch the mouse
             panel?.backgroundColor = t == .laser ? .clear : NSColor(white: 0, alpha: 0.01)
             if t != .laser { model.laserVisible = false }
         }
@@ -220,14 +221,14 @@ final class AnnotationController {
 
     func setColor(_ c: NSColor) { model.color = c; changed() }
 
-    // 调试用：注入一笔
+    // Debug: inject a stroke
     func debugStroke(_ pts: [CGPoint]) {
         guard let f = pts.first else { return }
         begin(f); pts.dropFirst().forEach { drag($0) }; end()
     }
     func debugLaser(_ p: CGPoint) { model.laserVisible = true; model.laser.append((p, CACurrentMediaTime())); changed() }
 
-    // MARK: 内部
+    // MARK: Internals
 
     private func setup() {
         if panel == nil {
@@ -273,16 +274,10 @@ final class AnnotationController {
         model.laser.removeAll(); model.laserVisible = false
     }
 
-    /// 让面板始终贴合源窗口
+    /// Keeps the panel aligned with the source window
     private func trackSource() {
-        guard let wid = sourceWindowID, let panel,
-              let info = (CGWindowListCopyWindowInfo([.optionIncludingWindow], wid) as? [[String: Any]])?.first,
-              (info[kCGWindowIsOnscreen as String] as? Bool) == true,
-              let bd = info[kCGWindowBounds as String] as? NSDictionary,
-              let r = CGRect(dictionaryRepresentation: bd as CFDictionary)
+        guard let wid = sourceWindowID, let panel, let f = onScreenFrame(of: wid)
         else { panel?.orderOut(nil); return }
-        let h = NSScreen.screens.first?.frame.height ?? 0
-        let f = CGRect(x: r.minX, y: h - r.maxY, width: r.width, height: r.height)
         if f != sourceFrame || !panel.isVisible {
             sourceFrame = f
             panel.setFrame(f, display: true)
@@ -340,7 +335,7 @@ final class AnnotationController {
     }
 }
 
-// MARK: - 全局快捷键（Carbon，无需额外权限）
+// MARK: - Global hotkeys (Carbon, no extra permission needed)
 
 enum HotKeys {
     nonisolated(unsafe) static var handlers: [UInt32: () -> Void] = [:]

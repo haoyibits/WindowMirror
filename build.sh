@@ -1,20 +1,28 @@
 #!/bin/bash
-# 构建 WindowMirror.app（ad-hoc 签名）
-# 产物放在 ~/Library/Caches/WindowMirror：项目目录若在 iCloud 同步的“文稿”里，
-# 系统会给 .app 加上扩展属性，导致 codesign 失败。
+# Builds WindowMirror.app (ad-hoc signed)
+# The output goes to ~/Library/Caches/WindowMirror: if the project lives in an iCloud-synced Documents folder,
+# the system adds extended attributes to the .app and codesign fails.
+# ARCHS="arm64 x86_64" builds a universal binary (defaults to the current machine's architecture).
 set -euo pipefail
 cd "$(dirname "$0")"
 OUT_DIR="$HOME/Library/Caches/WindowMirror"
 APP="$OUT_DIR/WindowMirror.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-swiftc -O -swift-version 5 \
-  -target "$(uname -m)-apple-macos14.0" \
-  Sources/*.swift \
-  -o "$APP/Contents/MacOS/WindowMirror"
+BIN_DIR="$OUT_DIR/bin"
+rm -rf "$BIN_DIR"
+mkdir -p "$BIN_DIR"
+for arch in ${ARCHS:-$(uname -m)}; do
+  swiftc -O -swift-version 5 \
+    -target "$arch-apple-macos14.0" \
+    Sources/*.swift \
+    -o "$BIN_DIR/WindowMirror-$arch"
+done
+lipo -create "$BIN_DIR"/WindowMirror-* -output "$APP/Contents/MacOS/WindowMirror"
+rm -rf "$BIN_DIR"
 cp Info.plist "$APP/Contents/Info.plist"
 cp Icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp -R Resources/*.lproj "$APP/Contents/Resources/"
 xattr -cr "$APP"
 codesign --force --sign - "$APP" >/dev/null
-echo "✅ 已生成 $APP"
+echo "✅ Built $APP"

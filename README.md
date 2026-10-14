@@ -23,7 +23,21 @@ WindowMirror is built for demos, lectures and meetings. It puts one window on a 
 
 ## Installation
 
-You need macOS 14 or later, plus the Xcode Command Line Tools for `swiftc`.
+You need macOS 14 or later.
+
+### Download
+
+Get `WindowMirror-x.y.dmg` from [Releases](https://github.com/haoyibits/WindowMirror/releases), open it, and drag WindowMirror into Applications. It runs on Apple silicon and Intel Macs.
+
+The app isn't notarized, so macOS blocks it the first time you open it. Go to System Settings › Privacy & Security and click "Open Anyway", or run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/WindowMirror.app
+```
+
+### Build from source
+
+You need the Xcode Command Line Tools for `swiftc`.
 
 ```bash
 git clone https://github.com/haoyibits/WindowMirror.git
@@ -31,7 +45,7 @@ cd WindowMirror
 ./install.sh
 ```
 
-`install.sh` builds and signs the app, installs it to `/Applications`, and launches it. To build without installing, run `./build.sh`. The output goes to `~/Library/Caches/WindowMirror/`.
+`install.sh` builds and signs the app, installs it to `/Applications`, and launches it. To build without installing, run `./build.sh`. The output goes to `~/Library/Caches/WindowMirror/`. `./package.sh` builds a universal app and packs it into a DMG in the same folder.
 
 ### Permissions
 
@@ -83,6 +97,7 @@ You draw on the source window on your main screen, and the mirror shows the same
 - **Switching and exiting:** Pressing the current tool's shortcut again also exits annotation mode.
 - **Colors and fading:** Set the color under "Annotate", and turn on "Fade Strokes After a Few Seconds" there.
 - **Pen and highlighter:** The annotation layer takes the mouse, so you can't click the source window while drawing. Switch to the laser pointer or exit annotation mode to use the window again.
+- **Floating toolbar:** Once you pick a window, a small toolbar sits above it on the main screen with the annotation tools, color, undo, clear, "Fit Source Window to Target" and Stop Mirroring. It follows the window and isn't captured. Turn it off with "Show Toolbar Above Source Window" under "Annotate".
 
 ### Language
 
@@ -100,10 +115,12 @@ The interface is English by default. If your system's preferred language is Chin
 ```
 Sources/main.swift        Menu bar app, capture engine, mirror window, source-window resizing, localization
 Sources/Annotation.swift  Annotations: model, rendering, overlay layer, global shortcuts
+Sources/Toolbar.swift     Floating toolbar above the source window
 Icon/draw_icon.swift      Draws the app icon with Core Graphics
 Icon/AppIcon.icns         Generated icon
 Resources/*.lproj         Localized app name
 build.sh / install.sh     Build and install scripts
+package.sh                Universal build packed into a DMG
 ```
 
 ## License

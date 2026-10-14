@@ -23,7 +23,21 @@
 
 ## 安装
 
-需要 macOS 14 及以上，以及 Xcode 命令行工具（提供 `swiftc`）。
+需要 macOS 14 及以上。
+
+### 下载
+
+在 [Releases](https://github.com/haoyibits/WindowMirror/releases) 下载 `WindowMirror-x.y.dmg`，打开后把 WindowMirror 拖进“应用程序”。Apple 芯片和 Intel 的 Mac 都能用。
+
+App 没有经过公证，第一次打开时会被系统拦下。到“系统设置 › 隐私与安全性”里点“仍要打开”，或者运行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/WindowMirror.app
+```
+
+### 从源码构建
+
+需要 Xcode 命令行工具（提供 `swiftc`）。
 
 ```bash
 git clone https://github.com/haoyibits/WindowMirror.git
@@ -31,7 +45,7 @@ cd WindowMirror
 ./install.sh
 ```
 
-`install.sh` 会编译、签名、安装到 `/Applications`，然后启动 App。如果只想编译不安装，运行 `./build.sh`，产物在 `~/Library/Caches/WindowMirror/`。
+`install.sh` 会编译、签名、安装到 `/Applications`，然后启动 App。如果只想编译不安装，运行 `./build.sh`，产物在 `~/Library/Caches/WindowMirror/`。`./package.sh` 会编译通用版本（Apple 芯片 + Intel）并打包成 DMG，放在同一目录。
 
 ### 权限
 
@@ -81,6 +95,7 @@ cd WindowMirror
 - **切换与退出：** 再按一次当前工具的快捷键也会退出标注。
 - **颜色与自动消失：** 在菜单“标注”里选择颜色，或打开“笔迹几秒后自动消失”。
 - **画笔和荧光笔模式：** 标注层会接住鼠标，源窗口暂时不能点。切到激光笔或退出标注后恢复。
+- **悬浮工具栏：** 选好窗口后，主屏上该窗口的上方会出现一个小工具栏，包含标注工具、颜色、撤销、清除、“按副屏调整源窗口”和“停止镜像”。它会跟着窗口移动，不会被镜像出去。可以在菜单“标注”里关闭“在源窗口上方显示工具栏”。
 
 ### 语言
 
@@ -98,10 +113,12 @@ cd WindowMirror
 ```
 Sources/main.swift        菜单栏 App、抓取引擎、镜像窗口、源窗口调整、界面语言
 Sources/Annotation.swift  标注：数据模型、渲染、透明标注层、全局快捷键
+Sources/Toolbar.swift     源窗口上方的悬浮工具栏
 Icon/draw_icon.swift      用 CoreGraphics 绘制图标
 Icon/AppIcon.icns         生成好的图标
 Resources/*.lproj         本地化的 App 名称
 build.sh / install.sh     构建 / 安装脚本
+package.sh                编译通用版本并打包成 DMG
 ```
 
 ## 许可证

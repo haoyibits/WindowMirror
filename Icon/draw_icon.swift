@@ -1,6 +1,6 @@
-// 绘制 WindowMirror 图标（1024×1024 PNG）
-// 用法：swift Icon/draw_icon.swift <输出.png>
-// 造型：实心小窗口 + 大屏幕线框 + 斜向箭头，表示把窗口放到更大的屏幕上
+// Draws the WindowMirror icon (1024×1024 PNG)
+// Usage: swift Icon/draw_icon.swift <output.png>
+// Design: a small solid window + a large outlined screen + a diagonal arrow, i.e. putting a window on a bigger screen
 import AppKit
 
 let S: CGFloat = 1024
@@ -8,7 +8,7 @@ let out = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "icon_102
 let cs = CGColorSpace(name: CGColorSpace.sRGB)!
 let ctx = CGContext(data: nil, width: Int(S), height: Int(S), bitsPerComponent: 8, bytesPerRow: 0,
                     space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-ctx.translateBy(x: 0, y: S); ctx.scaleBy(x: 1, y: -1)   // 左上角为原点
+ctx.translateBy(x: 0, y: S); ctx.scaleBy(x: 1, y: -1)   // Top-left origin
 
 func rgb(_ hex: UInt32, _ a: CGFloat = 1) -> CGColor {
     CGColor(srgbRed: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
@@ -18,7 +18,7 @@ func rr(_ r: CGRect, _ rad: CGFloat) -> CGPath { CGPath(roundedRect: r, cornerWi
 
 let top: UInt32 = 0x2FD3C4, bottom: UInt32 = 0x2B63F0, ink: UInt32 = 0x0B2A6B
 
-// 1. 底板（macOS 图标网格：824×824，圆角 185）
+// 1. Base plate (macOS icon grid: 824×824, corner radius 185)
 let plate = rr(CGRect(x: 100, y: 100, width: 824, height: 824), 185)
 ctx.saveGState()
 ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: rgb(0x000000, 0.35))
@@ -32,14 +32,14 @@ ctx.drawRadialGradient(glow, startCenter: CGPoint(x: 360, y: 150), startRadius: 
                        endCenter: CGPoint(x: 360, y: 150), endRadius: 600, options: [])
 ctx.restoreGState()
 
-// 2. 大屏幕线框
+// 2. Large screen outline
 let big = CGRect(x: 330, y: 230, width: 480, height: 360)
 ctx.saveGState()
 ctx.setShadow(offset: CGSize(width: 0, height: -8), blur: 20, color: rgb(ink, 0.35))
 ctx.addPath(rr(big, 56)); ctx.setStrokeColor(rgb(0xFFFFFF)); ctx.setLineWidth(40); ctx.strokePath()
 ctx.restoreGState()
 
-// 3. 实心小窗口（压住大框左下角）
+// 3. Small solid window (overlapping the large frame's bottom-left corner)
 let small = CGRect(x: 200, y: 520, width: 300, height: 230)
 ctx.saveGState()
 ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 26, color: rgb(ink, 0.40))
@@ -53,7 +53,7 @@ for i in 0..<3 {
     ctx.fillEllipse(in: CGRect(x: small.minX + 34 + CGFloat(i) * 30, y: small.minY + 22, width: 20, height: 20))
 }
 
-// 4. 斜向箭头：小窗口 → 大屏幕
+// 4. Diagonal arrow: small window → large screen
 let a0 = CGPoint(x: 560, y: 520), a1 = CGPoint(x: 680, y: 400)
 ctx.setLineCap(.round); ctx.setLineJoin(.round)
 ctx.setStrokeColor(rgb(0xFFFFFF)); ctx.setLineWidth(34)
