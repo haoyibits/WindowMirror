@@ -10,8 +10,6 @@
 
 WindowMirror is built for demos, lectures and meetings. It puts one window on a projector or external monitor. The audience sees only that window, and the rest of your main screen stays private.
 
-> The app's menus are currently in Chinese. This guide gives each menu item's Chinese label together with an English translation.
-
 ## Features
 
 - **Single-window mirroring:** Captures at 60 fps and at the source window's native resolution, using ScreenCaptureKit. The mirror keeps updating while the window is covered or partly off screen.
@@ -21,6 +19,7 @@ WindowMirror is built for demos, lectures and meetings. It puts one window on a 
 - **Annotations:** Draw with a laser pointer, pen or highlighter on the source window, and the mirror shows the same marks. Comes with global shortcuts, several colors, undo and optional auto-fading ink.
 - **Scaling modes:** Fit, fill, stretch, or native pixels (1:1, centered).
 - **Menu bar app:** Has no Dock icon. Everything is in the menu bar icon.
+- **English and Chinese:** The interface follows your system language, and you can switch it from the menu.
 
 ## Installation
 
@@ -38,7 +37,7 @@ cd WindowMirror
 
 | Permission | Used for | Without it |
 |---|---|---|
-| Screen & System Audio Recording | Listing windows and capturing them | Only "点选窗口…" (Pick window…) works, because it uses the system picker, which needs no permission |
+| Screen & System Audio Recording | Listing windows and capturing them | Only "Pick Window…" works, because it uses the system picker, which needs no permission |
 | Accessibility | Resizing the source window to fit the second screen | Resizing is unavailable, and everything else works |
 
 Both are under System Settings › Privacy & Security.
@@ -49,22 +48,22 @@ Both are under System Settings › Privacy & Security.
 
 Click the menu bar icon, the one with two overlapping rectangles:
 
-1. **Choose a window:** Click "点选窗口…" (Pick window…, ⌘P) and click the window you want. Or choose one from "从主屏窗口列表选择" (Choose from main-screen windows).
-2. **Target display:** The first secondary display is used by default. You can pick a different one under "目标显示器" (Target display).
-3. **Stop:** Click "停止镜像" (Stop mirroring). Or click the mirror once and press Esc. Mirroring also stops when the source window closes.
+1. **Choose a window:** Click "Pick Window…" (⌘P) and click the window you want. Or choose one from "Choose from Main-Screen Windows".
+2. **Target display:** The first secondary display is used by default. You can pick a different one under "Target Display".
+3. **Stop:** Click "Stop Mirroring". Or click the mirror once and press Esc. Mirroring also stops when the source window closes.
 
 While mirroring, the menu shows the source and target pixel sizes and the current scale factor.
 
 ### Fit the source window to the second screen
 
-These options are under "按副屏调整源窗口" (Fit source window to second screen).
+These options are under "Fit Source Window to Target".
 
 | Option | Shortcut | Result |
 |---|---|---|
-| 像素 1:1 (Pixel 1:1) | ⌃⌥M | Source window matches the second screen's pixel size, the sharpest result |
-| 同比例，尽量大 (Same ratio, largest) | ⌃⌥R | Largest size at the second screen's aspect ratio that fits the main screen's visible area |
-| 同比例，保持当前宽度 (Same ratio, keep width) | — | Keeps the width and changes only the height |
-| 同比例，保持当前高度 (Same ratio, keep height) | — | Keeps the height and changes only the width |
+| Pixel 1:1 | ⌃⌥M | Source window matches the second screen's pixel size, the sharpest result |
+| Same Ratio, Largest | ⌃⌥R | Largest size at the second screen's aspect ratio that fits the main screen's visible area |
+| Same Ratio, Keep Width | — | Keeps the width and changes only the height |
+| Same Ratio, Keep Height | — | Keeps the height and changes only the width |
 
 If the window doesn't fit, it is scaled down proportionally and moved back into the visible area. Some apps limit window sizes; for example, terminals resize in whole rows and columns. In that case the ratio can be slightly off, and the app shows how far off it is.
 
@@ -82,8 +81,12 @@ You draw on the source window on your main screen, and the mirror shows the same
 | ⌃⌥X | Exit annotation mode and clear all strokes |
 
 - **Switching and exiting:** Pressing the current tool's shortcut again also exits annotation mode.
-- **Colors and fading:** Set the color under "标注" (Annotate), and turn on "笔迹几秒后自动消失" (Fade strokes after a few seconds) there.
+- **Colors and fading:** Set the color under "Annotate", and turn on "Fade Strokes After a Few Seconds" there.
 - **Pen and highlighter:** The annotation layer takes the mouse, so you can't click the source window while drawing. Switch to the laser pointer or exit annotation mode to use the window again.
+
+### Language
+
+The interface is English by default. If your system's preferred language is Chinese, it switches to Chinese automatically. To choose a language yourself, use "Language / 语言" in the menu. It offers Follow System, English and 简体中文, and the change applies the next time you open the menu.
 
 ## Known limitations
 
@@ -95,10 +98,11 @@ You draw on the source window on your main screen, and the mirror shows the same
 ## Project layout
 
 ```
-Sources/main.swift        Menu bar app, capture engine, mirror window, source-window resizing
+Sources/main.swift        Menu bar app, capture engine, mirror window, source-window resizing, localization
 Sources/Annotation.swift  Annotations: model, rendering, overlay layer, global shortcuts
 Icon/draw_icon.swift      Draws the app icon with Core Graphics
 Icon/AppIcon.icns         Generated icon
+Resources/*.lproj         Localized app name
 build.sh / install.sh     Build and install scripts
 ```
 
@@ -125,6 +129,7 @@ open --env WM_DEBUG=1 --stderr /tmp/wm.log /Applications/WindowMirror.app
 | `WM_SNAPSHOT=<path.png>` | Save frame 30 as a PNG |
 | `WM_AUTOMATCH=<0-3>` | Fit the source window automatically; 0 to 3 are the four options in the table above |
 | `WM_TESTDRAW=<directory>` | Inject test annotations and save screenshots of the app's own windows to that directory |
+| `WM_DUMPMENU=1` | Print the full menu in English and Chinese, then quit |
 
 ## License
 

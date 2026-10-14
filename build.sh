@@ -14,6 +14,7 @@ swiftc -O -swift-version 5 \
   -o "$APP/Contents/MacOS/WindowMirror"
 cp Info.plist "$APP/Contents/Info.plist"
 cp Icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp -R Resources/*.lproj "$APP/Contents/Resources/"
 xattr -cr "$APP"
 codesign --force --sign - "$APP" >/dev/null
 echo "✅ 已生成 $APP"

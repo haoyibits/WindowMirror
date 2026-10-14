@@ -10,14 +10,34 @@ import Carbon.HIToolbox
 
 // MARK: - 小工具
 
+/// 界面语言：跟随系统（系统首选语言为中文时用中文，否则英文）/ 英文 / 中文
+enum AppLanguage: String, CaseIterable { case system, en, zh }
+
+enum L10n {
+    static var setting: AppLanguage {
+        get { AppLanguage(rawValue: UserDefaults.standard.string(forKey: "language") ?? "") ?? .system }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "language") }
+    }
+    static var isChinese: Bool {
+        switch setting {
+        case .en: return false
+        case .zh: return true
+        case .system: return Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") ?? false
+        }
+    }
+}
+
+/// 按当前语言取英文或中文
+func L(_ en: String, _ zh: String) -> String { L10n.isChinese ? zh : en }
+
 enum FillMode: String, CaseIterable {
     case fit, fill, stretch, native
     var title: String {
         switch self {
-        case .fit: return "适应（保持比例，留黑边）"
-        case .fill: return "填充（保持比例，裁掉边缘）"
-        case .stretch: return "拉伸铺满"
-        case .native: return "原始像素（1:1，不缩放，居中）"
+        case .fit: return L("Fit (keep ratio, letterbox)", "适应（保持比例，留黑边）")
+        case .fill: return L("Fill (keep ratio, crop edges)", "填充（保持比例，裁掉边缘）")
+        case .stretch: return L("Stretch", "拉伸铺满")
+        case .native: return L("Native pixels (1:1, no scaling, centered)", "原始像素（1:1，不缩放，居中）")
         }
     }
     var gravity: CALayerContentsGravity {
@@ -340,10 +360,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         runDebugHooks()
     }
 
+    private func dumpMenu(_ m: NSMenu, indent: Int) {
+        for it in m.items {
+            if it.isSeparatorItem { print(String(repeating: "  ", count: indent) + "----"); continue }
+            var key = ""
+            if !it.keyEquivalent.isEmpty {
+                key = it.keyEquivalentModifierMask.contains(.control) ? "  [⌃⌥\(it.keyEquivalent.uppercased())]" : "  [⌘\(it.keyEquivalent.uppercased())]"
+            }
+            print(String(repeating: "  ", count: indent) + (it.state == .on ? "✓ " : "") + it.title + key)
+            if let sub = it.submenu {
+                if sub === windowListMenu { rebuildWindowList() }
+                dumpMenu(sub, indent: indent + 1)
+            }
+        }
+    }
+
     /// 仅调试用：WM_AUTOSTART=<应用名片段> 自动镜像该应用在主屏的第一个窗口；
     /// WM_SNAPSHOT=<路径.png> 把第 30 帧原始画面存成图片
     private func runDebugHooks() {
         let env = ProcessInfo.processInfo.environment
+        if env["WM_DUMPMENU"] != nil {
+            let saved = L10n.setting
+            L10n.setting = .system
+            print("system languages:", Locale.preferredLanguages.prefix(2), "-> chinese:", L10n.isChinese)
+            for lang in [AppLanguage.en, .zh] {
+                L10n.setting = lang
+                rebuildMainMenu()
+                rebuildWindowList()
+                print("=== \(lang.rawValue) ===")
+                dumpMenu(menu, indent: 0)
+            }
+            L10n.setting = saved
+            print("tooltip:", statusItem.button?.toolTip ?? "-")
+            exit(0)
+        }
         if let path = env["WM_SNAPSHOT"] {
             var n = 0
             let show = engine.onFrame
@@ -404,8 +454,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     private func updateStatusIcon() {
         let name = mirroringTitle == nil ? "rectangle.on.rectangle" : "rectangle.fill.on.rectangle.fill"
-        statusItem.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: "窗口镜像")
-        statusItem.button?.toolTip = mirroringTitle.map { "正在镜像：\($0)" } ?? "窗口镜像"
+        statusItem.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: "WindowMirror")
+        statusItem.button?.toolTip = mirroringTitle.map { L("Mirroring: \($0)", "正在镜像：\($0)") } ?? L("WindowMirror", "窗口镜像")
     }
 
     func menuNeedsUpdate(_ m: NSMenu) {
@@ -415,13 +465,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private func rebuildMainMenu() {
         menu.removeAllItems()
 
-        let state = NSMenuItem(title: mirroringTitle.map { "正在镜像：\($0)" } ?? "未在镜像", action: nil, keyEquivalent: "")
+        let state = NSMenuItem(title: mirroringTitle.map { L("Mirroring: \($0)", "正在镜像：\($0)") } ?? L("Not mirroring", "未在镜像"), action: nil, keyEquivalent: "")
         state.isEnabled = false
         menu.addItem(state)
         menu.addItem(.separator())
 
-        menu.addItem(item("点选窗口…", #selector(pickWithSystemPicker), key: "p"))
-        let listItem = NSMenuItem(title: "从主屏窗口列表选择", action: nil, keyEquivalent: "")
+        menu.addItem(item(L("Pick Window…", "点选窗口…"), #selector(pickWithSystemPicker), key: "p"))
+        let listItem = NSMenuItem(title: L("Choose from Main-Screen Windows", "从主屏窗口列表选择"), action: nil, keyEquivalent: "")
         listItem.submenu = windowListMenu
         menu.addItem(listItem)
         menu.addItem(.separator())
@@ -437,24 +487,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             it.isEnabled = canAnnotate
             return it
         }
-        annMenu.addItem(toolItem("激光笔", .laser, "l"))
-        annMenu.addItem(toolItem("画笔", .pen, "d"))
-        annMenu.addItem(toolItem("荧光笔", .highlighter, "h"))
-        let exitAnn = item("退出标注", #selector(exitAnnotation), key: "x")
+        annMenu.addItem(toolItem(L("Laser Pointer", "激光笔"), .laser, "l"))
+        annMenu.addItem(toolItem(L("Pen", "画笔"), .pen, "d"))
+        annMenu.addItem(toolItem(L("Highlighter", "荧光笔"), .highlighter, "h"))
+        let exitAnn = item(L("Exit Annotation", "退出标注"), #selector(exitAnnotation), key: "x")
         exitAnn.keyEquivalentModifierMask = [.control, .option]
         exitAnn.isEnabled = annotations.tool != .none
         annMenu.addItem(exitAnn)
         annMenu.addItem(.separator())
-        let undo = item("撤销上一笔", #selector(undoStroke), key: "z")
+        let undo = item(L("Undo Last Stroke", "撤销上一笔"), #selector(undoStroke), key: "z")
         undo.keyEquivalentModifierMask = [.control, .option]
         annMenu.addItem(undo)
-        let clr = item("清除全部", #selector(clearStrokes), key: "c")
+        let clr = item(L("Clear All", "清除全部"), #selector(clearStrokes), key: "c")
         clr.keyEquivalentModifierMask = [.control, .option]
         annMenu.addItem(clr)
         annMenu.addItem(.separator())
         let colorMenu = NSMenu()
-        for (i, (name, c)) in Self.annotationColors.enumerated() {
-            let it = item(name, #selector(selectAnnotationColor(_:)))
+        for (i, (en, zh, c)) in Self.annotationColors.enumerated() {
+            let it = item(L(en, zh), #selector(selectAnnotationColor(_:)))
             it.tag = i
             it.state = annotations.model.color == c ? .on : .off
             let sw = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { r in
@@ -462,32 +512,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             it.image = sw
             colorMenu.addItem(it)
         }
-        let colorItem = NSMenuItem(title: "颜色", action: nil, keyEquivalent: "")
+        let colorItem = NSMenuItem(title: L("Color", "颜色"), action: nil, keyEquivalent: "")
         colorItem.submenu = colorMenu
         annMenu.addItem(colorItem)
-        let fade = item("笔迹几秒后自动消失", #selector(toggleAutoFade))
+        let fade = item(L("Fade Strokes After a Few Seconds", "笔迹几秒后自动消失"), #selector(toggleAutoFade))
         fade.state = annotations.model.autoFade ? .on : .off
         annMenu.addItem(fade)
-        let annItem = NSMenuItem(title: canAnnotate ? "标注" : "标注（先开始镜像）", action: nil, keyEquivalent: "")
+        let annItem = NSMenuItem(title: canAnnotate ? L("Annotate", "标注") : L("Annotate (start mirroring first)", "标注（先开始镜像）"), action: nil, keyEquivalent: "")
         annItem.submenu = annMenu
         menu.addItem(annItem)
         menu.addItem(.separator())
 
         // 目标显示器
         let screenMenu = NSMenu()
-        let auto = item("自动（第一块副屏）", #selector(selectTargetScreen(_:)))
+        let auto = item(L("Automatic (first secondary display)", "自动（第一块副屏）"), #selector(selectTargetScreen(_:)))
         auto.tag = 0
         auto.state = targetDisplayID == nil ? .on : .off
         screenMenu.addItem(auto)
         for s in NSScreen.screens {
             let isMain = s.displayID == CGMainDisplayID()
             let size = "\(Int(s.frame.width))×\(Int(s.frame.height))"
-            let it = item("\(s.localizedName)  \(size)\(isMain ? "（主屏，窗口模式）" : "")", #selector(selectTargetScreen(_:)))
+            let it = item("\(s.localizedName)  \(size)\(isMain ? L(" (main, windowed)", "（主屏，窗口模式）") : "")", #selector(selectTargetScreen(_:)))
             it.tag = Int(s.displayID)
             it.state = targetDisplayID == s.displayID ? .on : .off
             screenMenu.addItem(it)
         }
-        let screenItem = NSMenuItem(title: "目标显示器：\(targetScreen().localizedName)", action: nil, keyEquivalent: "")
+        let screenItem = NSMenuItem(title: L("Target Display: \(targetScreen().localizedName)", "目标显示器：\(targetScreen().localizedName)"), action: nil, keyEquivalent: "")
         screenItem.submenu = screenMenu
         menu.addItem(screenItem)
 
@@ -499,14 +549,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             it.state = f == fillMode ? .on : .off
             fillMenu.addItem(it)
         }
-        let fillItem = NSMenuItem(title: "缩放方式", action: nil, keyEquivalent: "")
+        let fillItem = NSMenuItem(title: L("Scaling", "缩放方式"), action: nil, keyEquivalent: "")
         fillItem.submenu = fillMenu
         menu.addItem(fillItem)
 
-        let cursor = item("显示鼠标指针", #selector(toggleCursor))
+        let cursor = item(L("Show Mouse Pointer", "显示鼠标指针"), #selector(toggleCursor))
         cursor.state = showsCursor ? .on : .off
         menu.addItem(cursor)
-        let hdrItem = item("HDR（保留高光，按源屏观感）", #selector(toggleHDR))
+        let hdrItem = item(L("HDR (keep highlights, match source look)", "HDR（保留高光，按源屏观感）"), #selector(toggleHDR))
         hdrItem.state = hdrEnabled ? .on : .off
         menu.addItem(hdrItem)
 
@@ -517,33 +567,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             if src.width > 0, dst.width > 0 {
                 let k = min(dst.width / src.width, dst.height / src.height)
                 let exact = abs(src.width - dst.width) <= 2 && abs(src.height - dst.height) <= 2
-                let desc = exact ? "像素 1:1 ✓" : String(format: "适应时%@ %.2f×", k >= 1 ? "放大" : "缩小", k)
-                let info = NSMenuItem(title: "源 \(Int(src.width))×\(Int(src.height)) → 目标 \(Int(dst.width))×\(Int(dst.height)) 像素，\(desc)",
+                let desc = exact ? L("pixel 1:1 ✓", "像素 1:1 ✓")
+                    : String(format: k >= 1 ? L("upscaled %.2f× when fitted", "适应时放大 %.2f×") : L("downscaled %.2f× when fitted", "适应时缩小 %.2f×"), k)
+                let info = NSMenuItem(title: L("Source \(Int(src.width))×\(Int(src.height)) → target \(Int(dst.width))×\(Int(dst.height)) px, \(desc)",
+                                                   "源 \(Int(src.width))×\(Int(src.height)) → 目标 \(Int(dst.width))×\(Int(dst.height)) 像素，\(desc)"),
                                       action: nil, keyEquivalent: "")
                 info.isEnabled = false
                 menu.addItem(info)
             }
             let resizeMenu = NSMenu()
-            for (mode, title, key) in [(ResizeMode.native, "像素 1:1（与副屏同尺寸）", "m"),
-                                       (.largest, "同比例，尽量大", "r"),
-                                       (.keepWidth, "同比例，保持当前宽度", ""),
-                                       (.keepHeight, "同比例，保持当前高度", "")] {
+            for (mode, title, key) in [(ResizeMode.native, L("Pixel 1:1 (same size as target)", "像素 1:1（与副屏同尺寸）"), "m"),
+                                       (.largest, L("Same Ratio, Largest", "同比例，尽量大"), "r"),
+                                       (.keepWidth, L("Same Ratio, Keep Width", "同比例，保持当前宽度"), ""),
+                                       (.keepHeight, L("Same Ratio, Keep Height", "同比例，保持当前高度"), "")] {
                 let it = item(title, #selector(resizeSourceAction(_:)), key: key)
                 if !key.isEmpty { it.keyEquivalentModifierMask = [.control, .option] }
                 it.tag = mode.rawValue
                 resizeMenu.addItem(it)
             }
-            let resizeItem = NSMenuItem(title: "按副屏调整源窗口", action: nil, keyEquivalent: "")
+            let resizeItem = NSMenuItem(title: L("Fit Source Window to Target", "按副屏调整源窗口"), action: nil, keyEquivalent: "")
             resizeItem.submenu = resizeMenu
             resizeItem.isEnabled = sourceWindowID != nil
             menu.addItem(resizeItem)
         }
         menu.addItem(.separator())
 
-        let stop = item("停止镜像", #selector(stopMirroringAction), key: "s")
+        let stop = item(L("Stop Mirroring", "停止镜像"), #selector(stopMirroringAction), key: "s")
         stop.isEnabled = mirroringTitle != nil
         menu.addItem(stop)
-        menu.addItem(item("退出", #selector(quit), key: "q"))
+        let langMenu = NSMenu()
+        for (lang, title) in [(AppLanguage.system, L("Follow System", "跟随系统")), (.en, "English"), (.zh, "简体中文")] {
+            let it = item(title, #selector(selectLanguage(_:)))
+            it.representedObject = lang.rawValue
+            it.state = L10n.setting == lang ? .on : .off
+            langMenu.addItem(it)
+        }
+        let langItem = NSMenuItem(title: "Language / 语言", action: nil, keyEquivalent: "")
+        langItem.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+        langItem.submenu = langMenu
+        menu.addItem(langItem)
+        menu.addItem(.separator())
+        menu.addItem(item(L("Quit", "退出"), #selector(quit), key: "q"))
     }
 
     private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
@@ -557,9 +621,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         windowListMenu.removeAllItems()
 
         if !CGPreflightScreenCaptureAccess() {
-            let it = item("需要“屏幕录制”权限，点此授权…", #selector(requestPermission))
+            let it = item(L("Screen Recording permission needed — click to grant…", "需要“屏幕录制”权限，点此授权…"), #selector(requestPermission))
             windowListMenu.addItem(it)
-            let hint = NSMenuItem(title: "（或者用“点选窗口…”，无需授权）", action: nil, keyEquivalent: "")
+            let hint = NSMenuItem(title: L("(Or use “Pick Window…”, which needs no permission)", "（或者用“点选窗口…”，无需授权）"), action: nil, keyEquivalent: "")
             hint.isEnabled = false
             windowListMenu.addItem(hint)
             return
@@ -595,7 +659,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             count += 1
         }
         if count == 0 {
-            let it = NSMenuItem(title: "主屏上没有可镜像的窗口", action: nil, keyEquivalent: "")
+            let it = NSMenuItem(title: L("No windows to mirror on the main screen", "主屏上没有可镜像的窗口"), action: nil, keyEquivalent: "")
             it.isEnabled = false
             windowListMenu.addItem(it)
         }
@@ -615,17 +679,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc private func selectWindowFromList(_ sender: NSMenuItem) {
         let windowID = CGWindowID(sender.tag)
-        let label = sender.representedObject as? String ?? "窗口"
+        let label = sender.representedObject as? String ?? L("Window", "窗口")
         Task {
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
                 guard let w = content.windows.first(where: { $0.windowID == windowID }) else {
-                    showAlert("找不到这个窗口", "它可能已经关闭或被最小化了。")
+                    showAlert(L("Window not found", "找不到这个窗口"), L("It may have been closed or minimized.", "它可能已经关闭或被最小化了。"))
                     return
                 }
                 startMirroring(filter: SCContentFilter(desktopIndependentWindow: w), title: label, window: w)
             } catch {
-                showAlert("无法获取窗口列表", error.localizedDescription)
+                showAlert(L("Couldn’t get the window list", "无法获取窗口列表"), error.localizedDescription)
             }
         }
     }
@@ -641,8 +705,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc private func toggleCursor() { showsCursor.toggle() }
 
-    static let annotationColors: [(String, NSColor)] = [
-        ("红", .systemRed), ("黄", .systemYellow), ("绿", .systemGreen), ("蓝", .systemBlue), ("白", .white),
+    @objc private func selectLanguage(_ sender: NSMenuItem) {
+        L10n.setting = AppLanguage(rawValue: sender.representedObject as? String ?? "") ?? .system
+        updateStatusIcon()
+        if let w = mirrorWindow, w.styleMask.contains(.titled) {
+            w.title = L("Mirror: \(mirroringTitle ?? "")", "镜像：\(mirroringTitle ?? "")")
+        }
+    }
+
+    static let annotationColors: [(String, String, NSColor)] = [
+        ("Red", "红", .systemRed), ("Yellow", "黄", .systemYellow), ("Green", "绿", .systemGreen),
+        ("Blue", "蓝", .systemBlue), ("White", "白", .white),
     ]
 
     private func setupAnnotations() {
@@ -677,7 +750,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc private func undoStroke() { annotations.undo() }
     @objc private func clearStrokes() { annotations.clear() }
     @objc private func selectAnnotationColor(_ sender: NSMenuItem) {
-        annotations.setColor(Self.annotationColors[sender.tag].1)
+        annotations.setColor(Self.annotationColors[sender.tag].2)
     }
     @objc private func toggleAutoFade() {
         annotations.model.autoFade.toggle()
@@ -697,7 +770,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                     sourceWindowID = wid; sourcePID = pid; mirroringTitle = t
                 } catch {
                     stopMirroring()
-                    showAlert("切换 HDR 失败", error.localizedDescription)
+                    showAlert(L("Couldn’t switch HDR", "切换 HDR 失败"), error.localizedDescription)
                 }
             }
         }
@@ -717,8 +790,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
                 NSWorkspace.shared.open(url)
             }
-            showAlert("请授予“屏幕录制”权限",
-                      "在“系统设置 › 隐私与安全性 › 屏幕与系统录音”中勾选 WindowMirror，然后重新打开本工具。")
+            showAlert(L("Please grant Screen Recording permission", "请授予“屏幕录制”权限"),
+                      L("Turn on WindowMirror in System Settings › Privacy & Security › Screen & System Audio Recording, then reopen the app.",
+                        "在“系统设置 › 隐私与安全性 › 屏幕与系统录音”中勾选 WindowMirror，然后重新打开本工具。"))
         }
     }
 
@@ -741,7 +815,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 mirrorView.hdr = engine.isHDR
             } catch {
                 stopMirroring()
-                showAlert("开始镜像失败", error.localizedDescription)
+                showAlert(L("Couldn’t start mirroring", "开始镜像失败"), error.localizedDescription)
             }
         }
     }
@@ -789,7 +863,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             let rect = NSRect(x: vf.midX - size.width / 2, y: vf.midY - size.height / 2, width: size.width, height: size.height)
             win = MirrorWindow(contentRect: rect, styleMask: [.titled, .closable, .resizable, .miniaturizable],
                                backing: .buffered, defer: false)
-            win.title = "镜像：\(mirroringTitle ?? "")"
+            win.title = L("Mirror: \(mirroringTitle ?? "")", "镜像：\(mirroringTitle ?? "")")
             win.delegate = self
         }
         win.isReleasedWhenClosed = false
@@ -847,8 +921,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         guard let wid = sourceWindowID, let pid = sourcePID, mirrorWindow != nil else { NSSound.beep(); return }
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         guard AXIsProcessTrustedWithOptions(opts) else {
-            showAlert("需要“辅助功能”权限",
-                      "调整其他应用的窗口大小需要此权限。请在“系统设置 › 隐私与安全性 › 辅助功能”中打开 WindowMirror，然后再试一次。")
+            showAlert(L("Accessibility permission needed", "需要“辅助功能”权限"),
+                      L("Resizing another app’s window needs this permission. Turn on WindowMirror in System Settings › Privacy & Security › Accessibility, then try again.",
+                        "调整其他应用的窗口大小需要此权限。请在“系统设置 › 隐私与安全性 › 辅助功能”中打开 WindowMirror，然后再试一次。"))
             return
         }
         let targetPx = mirrorView.pixelSize
@@ -858,7 +933,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
                 guard let w = content.windows.first(where: { $0.windowID == wid }) else {
-                    showAlert("找不到源窗口", "它可能已经关闭。"); return
+                    showAlert(L("Source window not found", "找不到源窗口"), L("It may have been closed.", "它可能已经关闭。")); return
                 }
                 // 源窗口所在显示器（取重叠面积最大的那块）及其可见区域（CG 坐标，左上角为原点）
                 let disp = content.displays.max(by: {
@@ -895,7 +970,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 origin.y = min(max(origin.y, vf.minY), vf.maxY - want.height)
 
                 guard let ax = Self.findAXWindow(pid: pid, frame: w.frame) else {
-                    showAlert("无法控制这个窗口", "该应用没有通过辅助功能暴露这个窗口。"); return
+                    showAlert(L("Can’t control this window", "无法控制这个窗口"), L("The app doesn’t expose this window through Accessibility.", "该应用没有通过辅助功能暴露这个窗口。")); return
                 }
                 Self.axSet(ax, kAXPositionAttribute, origin)
                 Self.axSet(ax, kAXSizeAttribute, want)
@@ -908,15 +983,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 let gotAspect = got.width / got.height
                 let k = min(targetPx.width / (got.width * srcScale), targetPx.height / (got.height * srcScale))
                 if abs(gotAspect - aspect) / aspect > 0.01 {
-                    showAlert("比例没能完全匹配",
-                              "目标 \(Int(want.width))×\(Int(want.height)) 点，窗口实际为 \(Int(got.width))×\(Int(got.height)) 点。" +
-                              "该应用可能限制了窗口的最小或最大尺寸，或者按固定步长调整大小（例如终端按字符行列）。")
+                    showAlert(L("Couldn’t match the ratio exactly", "比例没能完全匹配"),
+                              L("Target \(Int(want.width))×\(Int(want.height)) pt, actual window \(Int(got.width))×\(Int(got.height)) pt. " +
+                                "The app may limit its window size, or resize in fixed steps (for example, terminals resize by rows and columns).",
+                                "目标 \(Int(want.width))×\(Int(want.height)) 点，窗口实际为 \(Int(got.width))×\(Int(got.height)) 点。" +
+                                "该应用可能限制了窗口的最小或最大尺寸，或者按固定步长调整大小（例如终端按字符行列）。"))
                 } else if mode == .native && clamped {
-                    showAlert("主屏放不下 1:1 尺寸",
-                              "已按副屏比例缩小到 \(Int(got.width))×\(Int(got.height)) 点，副屏会铺满，但画面会放大 \(String(format: "%.2f", k)) 倍。")
+                    showAlert(L("The 1:1 size doesn’t fit on the main screen", "主屏放不下 1:1 尺寸"),
+                              L("Scaled down to \(Int(got.width))×\(Int(got.height)) pt at the target’s aspect ratio. The mirror fills the target screen but is upscaled \(String(format: "%.2f", k))×.",
+                                "已按副屏比例缩小到 \(Int(got.width))×\(Int(got.height)) 点，副屏会铺满，但画面会放大 \(String(format: "%.2f", k)) 倍。"))
                 }
             } catch {
-                showAlert("调整失败", error.localizedDescription)
+                showAlert(L("Resize failed", "调整失败"), error.localizedDescription)
             }
         }
     }
@@ -959,7 +1037,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 picker.isActive = false
-                var title = "所选窗口"
+                var title = L("Selected window", "所选窗口")
                 var window: SCWindow?
                 if #available(macOS 15.2, *), let w = filter.includedWindows.first {
                     window = w
@@ -978,7 +1056,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     nonisolated func contentSharingPickerStartDidFailWithError(_ error: Error) {
         DispatchQueue.main.async {
-            MainActor.assumeIsolated { self.showAlert("无法打开窗口选择器", error.localizedDescription) }
+            MainActor.assumeIsolated { self.showAlert(L("Couldn’t open the window picker", "无法打开窗口选择器"), error.localizedDescription) }
         }
     }
 
