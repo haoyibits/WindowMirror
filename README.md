@@ -119,12 +119,3 @@ open --env WM_DEBUG=1 --stderr /tmp/wm.log /Applications/WindowMirror.app
 | `WM_SNAPSHOT=<路径.png>` | 把第 30 帧原始画面存成图片 |
 | `WM_AUTOMATCH=<0-3>` | 自动按副屏调整源窗口，0 到 3 依次对应上表四种方式 |
 | `WM_TESTDRAW=<目录>` | 注入测试标注，并截下自身窗口存到该目录 |
-
-## 同类项目
-
-- **[benjones/presenterMode](https://github.com/benjones/presenterMode)：** 思路最接近，也是把单个窗口镜像到投影仪上的一个窗口里，同样使用系统窗口选择器，没有标注功能。
-- **[EthanLipnik/MirageKit](https://github.com/EthanLipnik/MirageKit)：** 点对点屏幕共享框架，可以把 Mac 的窗口或桌面推到 iPad、Vision Pro 或另一台 Mac，支持 1:1 像素映射，面向跨设备场景。
-- **[zRakan/Screeny](https://github.com/zRakan/Screeny)：** 把当前工作的屏幕镜像到虚拟显示器，供 Zoom、Meet 等共享，按整屏而不是单窗口工作。
-- **[a35hie/SideEye](https://github.com/a35hie/SideEye)：** 用画中画浮窗预览另一块显示器。
-
-标注方面，Presentify 等商业软件可以在全屏上画，但不会和单窗口镜像联动。
