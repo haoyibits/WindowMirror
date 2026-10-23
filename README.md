@@ -2,40 +2,154 @@
 
 <h1 align="center">WindowMirror</h1>
 
-<p align="center">Mirror a single window from your main display to a second screen in real time, and annotate it with a laser pointer, pen or highlighter.</p>
+<p align="center"><b>Put one window on the projector. Keep the rest of your screen to yourself.</b></p>
 
-<p align="center">English · <a href="README_zh.md">简体中文</a></p>
+<p align="center">
+  <a href="https://github.com/haoyibits/WindowMirror/releases/latest"><img src="https://img.shields.io/github/v/release/haoyibits/WindowMirror?label=download&color=2F5BFF" alt="Download"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-13203A" alt="macOS 14+">
+  <img src="https://img.shields.io/badge/Apple%20silicon%20%2B%20Intel-universal-13203A" alt="Apple silicon and Intel">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2BC4A0" alt="MIT license"></a>
+</p>
+
+<p align="center">English · <a href="README_zh.md"><b>简体中文</b></a></p>
+
+<p align="center"><img src="docs/media/pick.gif" alt="Picking a browser window on the main screen. The second screen shows only that window, and the private note next to it stays hidden."></p>
+<p align="center"><sub>Left: your Mac. Right: the projector. The note on the left never shows up on the right.</sub></p>
 
 ---
 
-WindowMirror is built for demos, lectures and meetings. It puts one window on a projector or external monitor. The audience sees only that window, and the rest of your main screen stays private.
+WindowMirror is a free menu bar app for macOS. It mirrors a single window to a projector or second monitor in real time, and lets you draw on it while you present. Your chats, notifications and desktop stay on your own screen.
 
-## Features
+## Why not just mirror or extend the display?
 
-- **Single-window mirroring:** Captures at 60 fps and at the source window's native resolution, using ScreenCaptureKit. The mirror keeps updating while the window is covered or partly off screen.
-- **Full-screen output:** The mirror fills the second display borderless and stays on top. It never takes focus away from your main screen. With only one display, the mirror opens as a regular window instead.
-- **Fit the source window to the second screen:** One click resizes the source window to the second screen's exact pixel size (1:1). It can also match only the aspect ratio, so the mirror fills the screen with no black bars.
-- **HDR and wide color:** Captures in half-float extended Display P3 to keep highlights, and shows the result with EDR on the second screen. It falls back to SDR when HDR capture isn't available.
-- **Annotations:** Draw with a laser pointer, pen or highlighter on the source window, and the mirror shows the same marks. Comes with global shortcuts, several colors, undo and optional auto-fading ink.
-- **Scaling modes:** Fit, fill, stretch, or native pixels (1:1, centered).
-- **Menu bar app:** Has no Dock icon. Everything is in the menu bar icon.
-- **English and Chinese:** The interface follows your system language, and you can switch it from the menu.
+| | What the audience sees | What you see |
+|---|---|---|
+| **Mirror Displays** (built into macOS) | Your entire screen, including chat pop-ups and other apps | The same thing |
+| **Extended display** | The window you dragged over | Nothing. You have to turn around to look at it |
+| **Screen sharing in a video call** | One window, but only for people on the call | Your normal screen |
+| **WindowMirror** | One window, full screen on the projector | Your normal screen, with that window still where you can work in it |
 
-## Installation
+It works with any app: a browser, a code editor, Figma, a PDF, a terminal.
 
-You need macOS 14 or later.
+## Get started
 
-### Download
+1. **[Download the DMG](https://github.com/haoyibits/WindowMirror/releases/latest)** and drag WindowMirror into Applications.
+2. Click the menu bar icon (two overlapping rectangles), then **Pick Window…**, and click the window you want to show.
+3. That window fills the second screen. Click **Stop Mirroring** when you're done.
 
-Get `WindowMirror-x.y.dmg` from [Releases](https://github.com/haoyibits/WindowMirror/releases), open it, and drag WindowMirror into Applications. It runs on Apple silicon and Intel Macs.
+The first time you open it, macOS will block it. See [First launch](#first-launch) below. It takes about 20 seconds.
 
-The app isn't notarized, so macOS blocks it the first time you open it. Go to System Settings › Privacy & Security and click "Open Anyway", or run:
+## Draw on it while you present
+
+<p align="center"><img src="docs/media/present.gif" alt="Underlining the title and a number with the pen. The marks appear on the second screen at the same time."></p>
+
+You draw on the window on your own screen, and the projector shows the same marks. Use the toolbar above the window, or the shortcuts:
+
+- **Laser pointer** (⌃⌥L): a glowing dot that follows your mouse. You can keep clicking and scrolling the window.
+- **Pen** (⌃⌥D) and **highlighter** (⌃⌥H): circle a number, underline a line of code.
+- **Undo** (⌃⌥Z), **clear** (⌃⌥C), and an option to fade strokes out after a few seconds.
+
+## Fill the projector, no black bars
+
+<p align="center"><img src="docs/media/fit.gif" alt="Choosing a fit option from the toolbar. The source window changes shape and the second screen fills edge to edge."></p>
+
+A window rarely has the same shape as the projector, so you get black bars. One click resizes the window to the projector's aspect ratio, or to its exact pixel size for the sharpest picture.
+
+## Also
+
+- **Smooth and sharp:** 60 fps at the window's native resolution. HDR and wide color are kept when your displays support them.
+- **Doesn't get in your way:** the mirror never takes focus from your main screen, and it keeps updating when the window is covered by other windows.
+- **Stays out of the Dock:** everything lives in the menu bar.
+- **English and Chinese:** follows your system language. You can also switch it from the menu.
+
+## First launch
+
+WindowMirror isn't notarized by Apple, so the first time you open it macOS says it can't verify the app. To open it anyway:
+
+1. Open it once and close the warning.
+2. Go to **System Settings › Privacy & Security**, scroll down, and click **Open Anyway** next to WindowMirror.
+
+Or run this in Terminal:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/WindowMirror.app
 ```
 
-### Build from source
+Then it asks for two permissions, both under System Settings › Privacy & Security:
+
+| Permission | Why it needs it | If you say no |
+|---|---|---|
+| Screen & System Audio Recording | To see the window's contents | You can still use **Pick Window…** |
+| Accessibility | To resize the window to fit the projector | Everything else works |
+
+## FAQ
+
+**Is it free?** Yes. It's open source under the MIT license.
+
+**Does it upload my screen anywhere?** No. The app makes no network connections. Everything stays on your Mac.
+
+**I only have one screen. Can I use it?** Yes. The mirror opens as a regular window on your screen instead.
+
+**Which Macs does it run on?** macOS 14 Sonoma or later, on Apple silicon and Intel.
+
+**Something's not working.** Please [open an issue](https://github.com/haoyibits/WindowMirror/issues). If WindowMirror is useful to you, a ⭐ helps other people find it.
+
+## Reference
+
+<details>
+<summary><b>All shortcuts</b></summary>
+
+| Shortcut | Action |
+|---|---|
+| ⌘P | Pick Window… (while the menu is open) |
+| ⌃⌥L | Laser pointer. Clicks pass through to the window, and the system cursor is hidden in the mirror |
+| ⌃⌥D | Pen |
+| ⌃⌥H | Highlighter |
+| ⌃⌥Z | Undo last stroke |
+| ⌃⌥C | Clear all |
+| ⌃⌥X | Exit annotation mode and clear all strokes |
+| ⌃⌥M | Resize the window to the projector's pixel size (1:1) |
+| ⌃⌥R | Resize the window to the projector's aspect ratio, as large as fits |
+
+The annotation shortcuts work from any app. Pressing the current tool's shortcut again exits annotation mode. With the pen or highlighter on, the drawing layer takes the mouse, so switch to the laser pointer or exit to click the window again.
+
+</details>
+
+<details>
+<summary><b>Menu options</b></summary>
+
+**Choosing a window and display.** Pick a window by clicking it, or from "Choose from Main-Screen Windows". The first secondary display is used by default; choose another under "Target Display". To stop, click "Stop Mirroring", or click the mirror and press Esc. Mirroring also stops when the window closes. While mirroring, the menu shows the source and target pixel sizes and the scale factor.
+
+**Fit Source Window to Target.**
+
+| Option | Result |
+|---|---|
+| Pixel 1:1 | The window matches the projector's pixel size. Sharpest |
+| Same Ratio, Largest | The largest size at the projector's aspect ratio that fits your screen |
+| Same Ratio, Keep Width | Changes only the height |
+| Same Ratio, Keep Height | Changes only the width |
+
+If the window doesn't fit, it's scaled down and moved back on screen. Some apps limit window sizes (terminals resize in whole rows and columns), so the ratio can be slightly off. The app tells you by how much.
+
+**Scaling.** Fit, fill, stretch, or native pixels (1:1, centered).
+
+**Annotate.** Choose the stroke color, turn on fading strokes, and show or hide the toolbar above the window. The toolbar follows the window and is never captured in the mirror.
+
+**Language / 语言.** Follow System, English or 简体中文. The change applies the next time you open the menu.
+
+</details>
+
+<details>
+<summary><b>Known limitations</b></summary>
+
+- The mirror stops updating while the window is minimized.
+- Two different displays won't match colors exactly, especially with True Tone on.
+- If the second screen uses a scaled resolution, macOS scales the image again, so physical pixels aren't strictly 1:1.
+
+</details>
+
+<details>
+<summary><b>Build from source</b></summary>
 
 You need the Xcode Command Line Tools for `swiftc`.
 
@@ -45,83 +159,20 @@ cd WindowMirror
 ./install.sh
 ```
 
-`install.sh` builds and signs the app, installs it to `/Applications`, and launches it. To build without installing, run `./build.sh`. The output goes to `~/Library/Caches/WindowMirror/`. `./package.sh` builds a universal app and packs it into a DMG in the same folder.
+`install.sh` builds and signs the app, installs it to `/Applications`, and launches it. `./build.sh` builds without installing, into `~/Library/Caches/WindowMirror/`. `./package.sh` builds a universal app and packs it into a DMG in the same folder. Build output stays out of the project folder because macOS adds extended attributes to `.app` bundles in iCloud-synced folders, which breaks code signing.
 
-### Permissions
-
-| Permission | Used for | Without it |
-|---|---|---|
-| Screen & System Audio Recording | Listing windows and capturing them | Only "Pick Window…" works, because it uses the system picker, which needs no permission |
-| Accessibility | Resizing the source window to fit the second screen | Resizing is unavailable, and everything else works |
-
-Both are under System Settings › Privacy & Security.
-
-> **Note:** The app is ad-hoc signed, so its signature changes on every rebuild and macOS treats each build as a new app. After rebuilding, remove the old entries in both settings above and add the app again. To avoid this, sign with a stable code-signing certificate by replacing `--sign -` in `build.sh` with your certificate's name.
-
-## Usage
-
-Click the menu bar icon, the one with two overlapping rectangles:
-
-1. **Choose a window:** Click "Pick Window…" (⌘P) and click the window you want. Or choose one from "Choose from Main-Screen Windows".
-2. **Target display:** The first secondary display is used by default. You can pick a different one under "Target Display".
-3. **Stop:** Click "Stop Mirroring". Or click the mirror once and press Esc. Mirroring also stops when the source window closes.
-
-While mirroring, the menu shows the source and target pixel sizes and the current scale factor.
-
-### Fit the source window to the second screen
-
-These options are under "Fit Source Window to Target".
-
-| Option | Shortcut | Result |
-|---|---|---|
-| Pixel 1:1 | ⌃⌥M | Source window matches the second screen's pixel size, the sharpest result |
-| Same Ratio, Largest | ⌃⌥R | Largest size at the second screen's aspect ratio that fits the main screen's visible area |
-| Same Ratio, Keep Width | — | Keeps the width and changes only the height |
-| Same Ratio, Keep Height | — | Keeps the height and changes only the width |
-
-If the window doesn't fit, it is scaled down proportionally and moved back into the visible area. Some apps limit window sizes; for example, terminals resize in whole rows and columns. In that case the ratio can be slightly off, and the app shows how far off it is.
-
-### Annotations
-
-You draw on the source window on your main screen, and the mirror shows the same marks. The shortcuts work from any app:
-
-| Shortcut | Action |
-|---|---|
-| ⌃⌥L | Laser pointer. Clicks pass through to the source window, and the system cursor is hidden in the mirror |
-| ⌃⌥D | Pen |
-| ⌃⌥H | Highlighter |
-| ⌃⌥Z | Undo last stroke |
-| ⌃⌥C | Clear all |
-| ⌃⌥X | Exit annotation mode and clear all strokes |
-
-- **Switching and exiting:** Pressing the current tool's shortcut again also exits annotation mode.
-- **Colors and fading:** Set the color under "Annotate", and turn on "Fade Strokes After a Few Seconds" there.
-- **Pen and highlighter:** The annotation layer takes the mouse, so you can't click the source window while drawing. Switch to the laser pointer or exit annotation mode to use the window again.
-- **Floating toolbar:** Once you pick a window, a small toolbar sits above it on the main screen with the annotation tools, color, undo, clear, "Fit Source Window to Target" and Stop Mirroring. It follows the window and isn't captured. Turn it off with "Show Toolbar Above Source Window" under "Annotate".
-
-### Language
-
-The interface is English by default. If your system's preferred language is Chinese, it switches to Chinese automatically. To choose a language yourself, use "Language / 语言" in the menu. It offers Follow System, English and 简体中文, and the change applies the next time you open the menu.
-
-## Known limitations
-
-- **Minimized windows:** The mirror stops updating while the source window is minimized.
-- **Color differences:** The two displays have different panels, and True Tone may be on. The mirror's colors can't match the source screen exactly.
-- **Physical pixels:** If the second screen uses a scaled resolution, macOS scales the image again, so physical pixels aren't strictly 1:1.
-- **Projects in iCloud folders:** macOS adds extended attributes to `.app` bundles in iCloud-synced folders, and those make code signing fail. That's why build output goes to `~/Library/Caches` instead of the project folder.
-
-## Project layout
+The app is ad-hoc signed, so macOS treats every rebuild as a new app. After rebuilding, remove the old entries under both permissions and add the app again. To avoid this, replace `--sign -` in `build.sh` with the name of a stable code-signing certificate.
 
 ```
-Sources/main.swift        Menu bar app, capture engine, mirror window, source-window resizing, localization
+Sources/main.swift        Menu bar app, capture engine, mirror window, window resizing, localization
 Sources/Annotation.swift  Annotations: model, rendering, overlay layer, global shortcuts
 Sources/Toolbar.swift     Floating toolbar above the source window
 Icon/draw_icon.swift      Draws the app icon with Core Graphics
-Icon/AppIcon.icns         Generated icon
 Resources/*.lproj         Localized app name
-build.sh / install.sh     Build and install scripts
-package.sh                Universal build packed into a DMG
+docs/media/               Demo GIFs for this README
 ```
+
+</details>
 
 ## License
 
