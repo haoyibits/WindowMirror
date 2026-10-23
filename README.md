@@ -39,6 +39,12 @@ It works with any app: a browser, a code editor, Figma, a PDF, a terminal.
 
 The first time you open it, macOS will block it. See [First launch](#first-launch) below. It takes about 20 seconds.
 
+## Fill the projector, no black bars
+
+<p align="center"><img src="docs/media/fit.gif" alt="Choosing a fit option from the toolbar. The source window changes shape and the second screen fills edge to edge."></p>
+
+A window rarely has the same shape as the projector, so you get black bars. One click resizes the window to the projector's aspect ratio, or to its exact pixel size for the sharpest picture.
+
 ## Draw on it while you present
 
 <p align="center"><img src="docs/media/present.gif" alt="Underlining the title and a number with the pen. The marks appear on the second screen at the same time."></p>
@@ -48,12 +54,6 @@ You draw on the window on your own screen, and the projector shows the same mark
 - **Laser pointer** (⌃⌥L): a glowing dot that follows your mouse. You can keep clicking and scrolling the window.
 - **Pen** (⌃⌥D) and **highlighter** (⌃⌥H): circle a number, underline a line of code.
 - **Undo** (⌃⌥Z), **clear** (⌃⌥C), and an option to fade strokes out after a few seconds.
-
-## Fill the projector, no black bars
-
-<p align="center"><img src="docs/media/fit.gif" alt="Choosing a fit option from the toolbar. The source window changes shape and the second screen fills edge to edge."></p>
-
-A window rarely has the same shape as the projector, so you get black bars. One click resizes the window to the projector's aspect ratio, or to its exact pixel size for the sharpest picture.
 
 ## Also
 
